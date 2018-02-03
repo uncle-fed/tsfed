@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>TS100 Font Editor</title>
+
+    <style type="text/css">
+        body                 { background: #dadada; margin: 10px; padding: 0; }
+        table                { font-size: 1px; border-collapse: collapse; border: 1px solid #666; border-spacing: 0; box-shadow: 2px 2px 5px 0px #bcb8b5; }
+        table#editor td      { border: 1px solid #999; cursor: pointer; padding:0; background: #fafafa; }
+        table#editor td.set  { background: #666666; }
+        table#preview        { position: absolute; top: 10px; }
+        table#preview td     { height: 2px; width: 2px; border: none; padding: 0; background: #333333; }
+        table#preview td.set { background: #fafafa; }
+        textarea             { margin-top: 10px; padding: 10px; width: 900px; display: block; font:normal 10pt monospace; }
+        button#update        { margin-top: 10px; }
+        div#move             { font:normal 10pt monospace; position: absolute; top: 80px; }
+        div#move button      { width: 60px; }
+        span                 { display:inline-block; margin-left: 20px; font: normal 10pt sans-serif; }
+    </style>
+
+    <script src="http://code.jquery.com/jquery-3.2.1.min.js"
+        integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous">
+    </script>
+
+    <script type="text/javascript">
+
+        $(function () {
+            "use strict";
+            const glyphWidth = 12;
+            const glyphHeight = 16; // cannot be changed as this is the number of bits
+            const tableWidth = 300;
+            const cellSize = parseInt(tableWidth / glyphWidth);
+            const emptyCellEditor = "<td style=\"width:" + cellSize + "px;height:" + cellSize + "px\"></td>";
+            const emptyRowEditor = "<tr>" + emptyCellEditor.repeat(glyphWidth) + "</tr>";
+            const emptyRowPreview = "<tr>" + String("<td></td>").repeat(glyphWidth) + "</tr>";
+
+            function displayMessage(message) {
+                $("span").stop(true, true).text(message).show().delay(5000).fadeOut("slow");
+            }
+
+            function updateGlyphValues() {
+                const values = [];
+                let index;
+                let bit;
+                for (index = 0; index < glyphWidth * 2; index += 1) {
+                    let value = 0;
+                    for (bit = 0; bit < 8; bit += 1) {
+                        if ($("table#editor tr").eq(bit + 8 * Math.floor(index / glyphWidth)).find("td").eq(index % glyphWidth).hasClass("set")) {
+                            value |= 1 << bit;
+                        }
+                    }
+                    values.push(
+                        "0x" + (value < 16
+                            ? "0"
+                            : "")
+                        + value.toString(16).toUpperCase()
+                    );
+                }
+                $("textarea").val(values.join(","));
+            }
+
+            function setGridValue(hexValue, index) {
+                const binValue = parseInt(hexValue, 16);
+                let bit;
+                for (bit = 0; bit < 8; bit += 1) {
+                    if ((binValue & (1 << bit)) !== 0) {
+                        $("table#editor tr").eq(bit + 8 * Math.floor(index / glyphWidth)).find("td").eq(index % glyphWidth).addClass("set");
+                    }
+                }
+            }
+
+            function updatePreviewGrid() {
+                const $tds = $("table#preview td").removeClass("set");
+                $("table#editor td").each(function (index, td) {
+                    if ($(td).hasClass("set")) {
+                        $tds.eq(index).addClass("set");
+                    }
+                });
+            }
+
+            function updateGrid() {
+                const values = $("textarea").val();
+                const regex = new RegExp("^\\s*0x[0-9A-F]?[0-9A-F]\\s*(,\\s*0x[0-9A-F]?[0-9A-F]\\s*){" + (glyphWidth * 2 - 1) + "}", "i");
+                if (values.search(regex) === -1) {
+                    displayMessage(
+                        "The text field should contain " + (glyphWidth * 2) +
+                        " comma separated hex numbers, as in:  0xFF, 0x0A,..."
+                    );
+                    return;
+                }
+                $("td").removeClass("set");
+                values.split(/\s*,\s*/).slice(0, glyphWidth * 2).forEach(setGridValue);
+                updatePreviewGrid();
+            }
+
+            function moveUp () {
+                $("table#editor tr").eq(0).remove();
+                $("table#editor").append(emptyRowEditor);
+                updatePreviewGrid();
+            }
+
+            function moveDown () {
+                $("table#editor tr").eq(15).remove();
+                $("table#editor").prepend(emptyRowEditor);
+                updatePreviewGrid();
+            }
+
+            function moveLeft () {
+                $("table#editor tr td:nth-child(1)").remove();
+                $("table#editor tr").append(emptyCellEditor);
+                updatePreviewGrid();
+            }
+
+            function moveRight () {
+                $("table#editor tr td:nth-child(" + glyphWidth + ")").remove();
+                $("table#editor tr").prepend(emptyCellEditor);
+                updatePreviewGrid();
+            }
+
+            $("table#editor").append(emptyRowEditor.repeat(glyphHeight));
+            $("table#preview").append(emptyRowPreview.repeat(glyphHeight)).css({left: $("table#editor").width() + 50});
+            $("div#move").css({left: $("table#editor").width() + 50});
+
+            $("table#editor").on("click", "td", function (e) {
+                $(e.target).toggleClass("set");
+                updateGlyphValues();
+                updatePreviewGrid();
+            });
+
+            $("textarea").val("0x00,0x00,0x00,0xB8,0xFC,0xC6,0xE2,0x3E,0x1C,0x00,0x00,0x00,0x00,0x00,0x1F,0x3F,0x31,0x21,0x37,0x1E,0x1C,0x36,0x22,0x00");
+
+            $("button#up").on("click", moveUp);
+            $("button#down").on("click", moveDown);
+            $("button#left").on("click", moveLeft);
+            $("button#right").on("click", moveRight);
+            $("button#update").on("click", updateGrid).trigger("click");
+
+        });
+
+      </script>
+</head>
+
+<body>
+    <table id="editor"></table>
+    <table id="preview"></table>
+    <div id="move">Move:
+        <button id="up">Up</button>
+        <button id="down">Down</button>
+        <button id="left">Left</button>
+        <button id="right">Right</button>
+    </div>
+    <textarea autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+    <button id="update">Update Grid</button>
+    <span></span>
+</body>
+
+</html>
